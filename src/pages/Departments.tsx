@@ -8,10 +8,9 @@ import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
 import { fetchWithFallback, saveToDatabase, deleteFromDatabase } from '../services/api';
 import { Department } from '../types';
-import { mockDepartments } from '../services/dataStorage';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const iconMap: Record<string, any> = {
+const iconMap = {
   'Cardiology': HeartPulse,
   'Orthopedics': Activity,
   'Neurology': Brain,
@@ -32,7 +31,7 @@ export const Departments = () => {
   const [depts, setDepts] = React.useState<Department[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
-  const [editingDept, setEditingDept] = React.useState<Department | null>(null);
+  const [editingDept, setEditingDept] = React.useState<Department | undefined>(undefined);
   
   // Form State
   const [formData, setFormData] = React.useState({
@@ -42,7 +41,7 @@ export const Departments = () => {
 
   const loadDepartments = React.useCallback(async () => {
     setIsLoading(true);
-    const data = await fetchWithFallback<Department>('departments', mockDepartments, user?.tenantId);
+    const data = await fetchWithFallback<Department>('departments', [], user?.tenantId);
     setDepts(data);
     setIsLoading(false);
   }, [user?.tenantId]);
@@ -56,7 +55,7 @@ export const Departments = () => {
       setEditingDept(dept);
       setFormData({ name: dept.name, description: dept.description });
     } else {
-      setEditingDept(null);
+      setEditingDept(undefined);
       setFormData({ name: '', description: '' });
     }
     setIsModalOpen(true);
@@ -64,19 +63,19 @@ export const Departments = () => {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setEditingDept(null);
+    setEditingDept(undefined);
     setFormData({ name: '', description: '' });
   };
 
-  const [error, setError] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | undefined>(undefined);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
+    setError(undefined);
     if (!user?.tenantId) return;
 
     try {
-      const newDept: Department = {
+      const newDept = {
         id: editingDept?.id || `dept-${Date.now()}`,
         name: formData.name,
         description: formData.description,
@@ -86,9 +85,10 @@ export const Departments = () => {
       await saveToDatabase('departments', newDept);
       await loadDepartments();
       handleCloseModal();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Save failed:', err);
-      setError(err.message || 'Failed to initialize unit. Check database connection and policies.');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to initialize unit. Check database connection and policies.';
+      setError(errorMessage);
     }
   };
 
@@ -157,7 +157,7 @@ export const Departments = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         <AnimatePresence>
           {filteredDepts.map((dept) => {
-            const Icon = iconMap[dept.name] || Building2;
+            const Icon = (iconMap as Record<string, React.ElementType>)[dept.name] || Building2;
             return (
               <motion.div 
                 layout
