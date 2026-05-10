@@ -19,7 +19,6 @@ import { Prescription, PrescriptionStatus, InventoryItem, Patient } from '../typ
 import { motion, AnimatePresence } from 'motion/react';
 import { PrescriptionForm } from '../components/PrescriptionForm';
 import { fetchWithFallback, saveToDatabase } from '../services/api';
-import { mockPrescriptions } from '../services/dataStorage';
 
 export const Prescriptions = () => {
   const { user } = useAuthStore();
@@ -31,7 +30,7 @@ export const Prescriptions = () => {
   const { data: prescriptions, isLoading } = useQuery({
     queryKey: ['prescriptions', user?.tenantId],
     queryFn: async () => {
-      return fetchWithFallback('prescriptions', mockPrescriptions, user?.tenantId);
+      return fetchWithFallback<Prescription>('prescriptions', [], user?.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -39,7 +38,7 @@ export const Prescriptions = () => {
   const { data: patients } = useQuery({
     queryKey: ['patients', user?.tenantId],
     queryFn: async () => {
-      return fetchWithFallback('patients', [], user?.tenantId);
+      return fetchWithFallback<Patient>('patients', [], user?.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -54,7 +53,7 @@ export const Prescriptions = () => {
         status: PrescriptionStatus.ACTIVE,
         tenantId: user?.tenantId || ''
       };
-      return saveToDatabase('prescriptions', newRx, mockPrescriptions);
+      return saveToDatabase('prescriptions', newRx);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
@@ -65,7 +64,7 @@ export const Prescriptions = () => {
   const fulfillPrescriptionMutation = useMutation({
     mutationFn: async (rx: Prescription) => {
       const updatedRx = { ...rx, status: PrescriptionStatus.COMPLETED };
-      return saveToDatabase('prescriptions', updatedRx, mockPrescriptions);
+      return saveToDatabase('prescriptions', updatedRx);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });

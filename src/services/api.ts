@@ -15,7 +15,7 @@ export async function fetchWithFallback<T>(
       
       const { data, error } = await query;
       
-      if (!error && data && data.length > 0) {
+      if (!error && data) {
         return data as T[];
       }
       if (error) console.warn('Supabase fetch error:', error);
@@ -48,14 +48,36 @@ export async function saveToDatabase<T extends { id: string }>(
   try {
     // Attempt Supabase Save
     if (import.meta.env.VITE_SUPABASE_URL) {
+      // Create a copy to avoid mutating the original
+      const payload: any = { ...item };
+      
+      // If the database uses lowercase (default Postgres), 
+      // some environments prefer 'tenantid' over 'tenantId'
+      // We send both or check the error
       const { data, error } = await supabase
         .from(table)
-        .upsert(item)
+        .upsert(payload)
         .select()
         .single();
         
       if (!error && data) return data as T;
-      if (error) console.warn('Supabase save error:', error);
+      
+      if (error) {
+        // If it's a column missing error for tenantId, try lowercase
+        if (error.message.includes('tenantId') && error.message.includes('column')) {
+           payload.tenantid = payload.tenantId;
+           delete payload.tenantId;
+           const { data: retryData, error: retryError } = await supabase
+             .from(table)
+             .upsert(payload)
+             .select()
+             .single();
+           if (!retryError && retryData) return retryData as T;
+           if (retryError) throw retryError;
+        }
+        console.error('Supabase save error:', error);
+        throw error;
+      }
     }
 
     // Attempt Express Local API Fallback

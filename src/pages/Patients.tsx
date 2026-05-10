@@ -2,7 +2,6 @@ import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
 import { Patient, Diagnosis, Prescription, PrescriptionStatus, AdmissionStatus, Admission } from '../types';
-import { mockPatients, mockDiagnoses, mockPrescriptions, mockAdmissions } from '../services/dataStorage';
 import { Plus, Search, Filter, MoreVertical, FileText, UserCircle, Bed, Clipboard, Activity, Stethoscope, ChevronRight, X, Loader2, Trash2, Edit2, History } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -42,7 +41,7 @@ export const Patients = ({ onNavigate }: { onNavigate?: (tab: string) => void })
         date: Date.now()
       };
       
-      return saveToDatabase('diagnoses', newDiagnosis, mockDiagnoses);
+      return saveToDatabase('diagnoses', newDiagnosis);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientDiagnoses', selectedPatient?.id] });
@@ -68,7 +67,7 @@ export const Patients = ({ onNavigate }: { onNavigate?: (tab: string) => void })
         createdAt: Date.now()
       };
       
-      return saveToDatabase('prescriptions', newPrescription, mockPrescriptions);
+      return saveToDatabase('prescriptions', newPrescription);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patientPrescriptions', selectedPatient?.id] });
@@ -96,7 +95,7 @@ export const Patients = ({ onNavigate }: { onNavigate?: (tab: string) => void })
         createdAt: Date.now()
       };
       
-      return saveToDatabase('patients', newPatient, mockPatients);
+      return saveToDatabase('patients', newPatient);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
@@ -109,7 +108,7 @@ export const Patients = ({ onNavigate }: { onNavigate?: (tab: string) => void })
     queryFn: async () => {
       if (!user?.tenantId) return [];
       
-      return fetchWithFallback('patients', mockPatients, user.tenantId, (q) => {
+      return fetchWithFallback<Patient>('patients', [], user.tenantId, (q) => {
         if (user.role === 'PATIENT') return q.eq('userId', user.uid);
         return q;
       });
@@ -173,7 +172,7 @@ export const Patients = ({ onNavigate }: { onNavigate?: (tab: string) => void })
         observations: []
       };
       
-      return saveToDatabase('admissions', newAdmission, mockAdmissions);
+      return saveToDatabase('admissions', newAdmission);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admissions'] });
@@ -536,7 +535,7 @@ const PatientClinicalHistory = ({ patientId, tenantId }: { patientId: string; te
   const { data: diagnoses, isLoading: diagnosesLoading } = useQuery({
     queryKey: ['patientDiagnoses', patientId],
     queryFn: async () => {
-      return fetchWithFallback('diagnoses', mockDiagnoses, tenantId, (q) => q.eq('patientId', patientId));
+      return fetchWithFallback<Diagnosis>('diagnoses', [], tenantId, (q) => q.eq('patientId', patientId));
     },
     enabled: !!tenantId && !!patientId
   });
@@ -544,7 +543,7 @@ const PatientClinicalHistory = ({ patientId, tenantId }: { patientId: string; te
   const { data: prescriptions, isLoading: prescriptionsLoading } = useQuery({
     queryKey: ['patientPrescriptions', patientId],
     queryFn: async () => {
-      return fetchWithFallback('prescriptions', mockPrescriptions, tenantId, (q) => q.eq('patientId', patientId));
+      return fetchWithFallback<Prescription>('prescriptions', [], tenantId, (q) => q.eq('patientId', patientId));
     },
     enabled: !!tenantId && !!patientId
   });

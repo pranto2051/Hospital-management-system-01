@@ -22,35 +22,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-// Local Mock Storage
-let mockLabReports: LabReport[] = [
-  { 
-    id: 'LR-2001', 
-    patientId: 'PID-1001', 
-    patientName: 'John Smith', 
-    testName: 'Complete Blood Count', 
-    specialization: 'Hematology', 
-    status: LabReportStatus.COMPLETED, 
-    tenantId: 'MediCore Central', 
-    date: new Date(Date.now() - 86400000).toISOString(),
-    technicianId: 'tech-1',
-    technicianName: 'Mike Tech',
-    createdAt: Date.now()
-  },
-  { 
-    id: 'LR-2002', 
-    patientId: 'PID-1002', 
-    patientName: 'Sarah Connor', 
-    testName: 'Liver Function Test', 
-    specialization: 'Biochemistry', 
-    status: LabReportStatus.PENDING, 
-    tenantId: 'MediCore Central', 
-    date: new Date().toISOString(),
-    technicianId: 'tech-1',
-    technicianName: 'Mike Tech',
-    createdAt: Date.now()
-  }
-];
 
 const labRequestSchema = z.object({
   patientId: z.string().min(1, 'Patient is required'),
@@ -77,7 +48,7 @@ export const LabReports = () => {
     queryFn: async () => {
       if (!user?.tenantId) return [];
       
-      return fetchWithFallback('lab_reports', mockLabReports, user.tenantId, (q) => {
+      return fetchWithFallback<LabReport>('lab_reports', [], user.tenantId, (q) => {
         if (user.role === 'PATIENT') return q.eq('patientId', user.uid);
         return q;
       });
@@ -89,7 +60,7 @@ export const LabReports = () => {
     queryKey: ['patients', user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return fetchWithFallback('patients', [], user.tenantId);
+      return fetchWithFallback<Patient>('patients', [], user.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -117,7 +88,7 @@ export const LabReports = () => {
         createdAt: Date.now()
       };
 
-      return saveToDatabase('lab_reports', newReport, mockLabReports);
+      return saveToDatabase('lab_reports', newReport);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lab_reports'] });
@@ -135,7 +106,7 @@ export const LabReports = () => {
         status: LabReportStatus.COMPLETED
       };
 
-      await saveToDatabase('lab_reports', updatedReport, mockLabReports);
+      await saveToDatabase('lab_reports', updatedReport);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lab_reports'] });

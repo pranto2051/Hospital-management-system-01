@@ -1,8 +1,7 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../store/authStore';
-import { Doctor, DoctorAvailability } from '../types';
-import { mockDoctors, mockDepartments } from '../services/dataStorage';
+import { Doctor, DoctorAvailability, Department } from '../types';
 import { Stethoscope, Plus, Search, Filter, MoreVertical, Star, X, Calendar, Clock, DollarSign, Award, AtSign, Loader2, UserCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -37,7 +36,16 @@ export const Doctors = () => {
     queryKey: ['doctors', user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return fetchWithFallback('doctors', mockDoctors, user.tenantId);
+      return fetchWithFallback<Doctor>('doctors', [], user.tenantId);
+    },
+    enabled: !!user?.tenantId
+  });
+
+  const { data: departments = [] } = useQuery({
+    queryKey: ['departments', user?.tenantId],
+    queryFn: async () => {
+      if (!user?.tenantId) return [];
+      return fetchWithFallback<Department>('departments', [], user.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -68,9 +76,7 @@ export const Doctors = () => {
         tenantId: user.tenantId
       };
       
-      await saveToDatabase('doctors', newDoctor);
-      mockDoctors.unshift(newDoctor);
-      return newDoctor;
+      return await saveToDatabase('doctors', newDoctor);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['doctors'] });
@@ -87,8 +93,8 @@ export const Doctors = () => {
   const [menuOpenId, setMenuOpenId] = React.useState<string | null>(null);
 
   const specializations = React.useMemo(() => {
-    return ['All', ...mockDepartments.map(d => d.name)];
-  }, []);
+    return ['All', ...departments.map(d => d.name)];
+  }, [departments]);
 
   const filteredDoctors = React.useMemo(() => {
     if (!doctors) return [];
@@ -320,7 +326,7 @@ export const Doctors = () => {
                       className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs outline-none focus:ring-2 focus:ring-blue-500/20 font-bold"
                     >
                       <option value="">Select Dept</option>
-                      {mockDepartments.map(dept => (
+                      {departments.map(dept => (
                         <option key={dept.id} value={dept.id}>{dept.name}</option>
                       ))}
                     </select>

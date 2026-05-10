@@ -324,6 +324,7 @@ export interface RegisteredDevice {
   lastIp: string;
   lastSeen: number;
   isTrusted: boolean;
+  userId: string;
   userName: string;
   tenantId: string;
 }

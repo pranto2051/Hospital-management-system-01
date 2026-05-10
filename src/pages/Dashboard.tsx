@@ -53,30 +53,15 @@ export const Dashboard = () => {
       const appointments = await fetchWithFallback('appointments', [], user.tenantId, (q) => q.order('date', { ascending: true }).limit(5));
 
       return {
-        totalPatients: patients.length || 1250,
-        activeAdmissions: admissions.length || 42,
-        recentAppointments: appointments.length > 0 ? appointments.map((a: any) => ({
+        totalPatients: patients.length,
+        activeAdmissions: admissions.length,
+        recentAppointments: appointments.map((a: any) => ({
           id: a.id,
-          patientName: a.patientId, // In real app we'd join, for now use ID or mock
+          patientName: a.patientName || a.patientId,
           specialization: a.reason || 'General',
-          time: new Date(`${a.date} ${a.time}`).getTime() || Date.now(),
+          time: new Date(`${a.date}T${a.time}`).getTime() || Date.now(),
           status: a.status
-        })) : [
-          {
-            id: 'apt-001',
-            patientName: 'John Doe',
-            specialization: 'Cardiology',
-            time: Date.now() + 1000 * 60 * 30,
-            status: 'PENDING'
-          },
-          {
-            id: 'apt-002',
-            patientName: 'Jane Smith',
-            specialization: 'Neurology',
-            time: Date.now() + 1000 * 60 * 60,
-            status: 'CONFIRMED'
-          }
-        ]
+        }))
       };
     },
     enabled: !!user?.tenantId,

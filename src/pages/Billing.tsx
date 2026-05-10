@@ -18,15 +18,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ExpenseForm } from '../components/ExpenseForm';
 import { PaymentRecordForm } from '../components/PaymentRecordForm';
 
-// Local Mock Storage
-let mockInvoices: Invoice[] = [
-  { id: 'inv-1', patientId: 'p-1', amount: 1500, status: InvoiceStatus.PAID, dueDate: new Date('2026-06-01').getTime(), tenantId: 'MediCore Central', createdAt: Date.now(), items: [] },
-  { id: 'inv-2', patientId: 'p-2', amount: 850, status: InvoiceStatus.UNPAID, dueDate: new Date('2026-06-05').getTime(), tenantId: 'MediCore Central', createdAt: Date.now(), items: [] }
-];
-
-let mockExpenses: Expense[] = [
-  { id: 'exp-1', category: 'SUPPLIES', description: 'Medical Kits', amount: 450, date: new Date('2026-05-01').getTime(), recordedBy: 'u-1', recordedByName: 'Admin User', tenantId: 'MediCore Central' }
-];
 
 import { fetchWithFallback, saveToDatabase } from '../services/api';
 
@@ -42,7 +33,7 @@ export const Billing = () => {
     queryKey: ['invoices', user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return fetchWithFallback('invoices', mockInvoices, user.tenantId);
+      return fetchWithFallback<Invoice>('invoices', [], user.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -51,7 +42,7 @@ export const Billing = () => {
     queryKey: ['expenses', user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return fetchWithFallback('expenses', mockExpenses, user.tenantId);
+      return fetchWithFallback<Expense>('expenses', [], user.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -59,7 +50,7 @@ export const Billing = () => {
   const { data: patients } = useQuery({
     queryKey: ['patients', user?.tenantId],
     queryFn: async () => {
-      return fetchWithFallback('patients', [], user.tenantId);
+      return fetchWithFallback<Patient>('patients', [], user.tenantId);
     }
   });
 
@@ -75,8 +66,7 @@ export const Billing = () => {
         tenantId: user.tenantId
       };
       
-      await saveToDatabase('expenses', newExpense);
-      mockExpenses.unshift(newExpense);
+      return await saveToDatabase('expenses', newExpense);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expenses'] });
@@ -88,12 +78,8 @@ export const Billing = () => {
     mutationFn: async (values: any) => {
       if (!user?.tenantId || !selectedInvoice) return;
       
-      // Mock update
-      const idx = mockInvoices.findIndex(inv => inv.id === selectedInvoice.id);
-      if (idx !== -1) {
-        mockInvoices[idx].status = InvoiceStatus.PAID;
-      }
-      await new Promise(resolve => setTimeout(resolve, 300));
+      const updatedInvoice = { ...selectedInvoice, status: InvoiceStatus.PAID };
+      return await saveToDatabase('invoices', updatedInvoice);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });

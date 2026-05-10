@@ -20,7 +20,6 @@ const itemSchema = z.object({
 type ItemFormValues = z.infer<typeof itemSchema>;
 
 import { fetchWithFallback, saveToDatabase } from '../services/api';
-import { mockInventory } from '../services/dataStorage';
 
 export const Inventory = () => {
   const { user } = useAuthStore();
@@ -33,7 +32,7 @@ export const Inventory = () => {
     queryKey: ['inventory', user?.tenantId],
     queryFn: async () => {
       if (!user?.tenantId) return [];
-      return fetchWithFallback('inventory', mockInventory, user.tenantId);
+      return fetchWithFallback<InventoryItem>('inventory', [], user.tenantId);
     },
     enabled: !!user?.tenantId
   });
@@ -48,7 +47,7 @@ export const Inventory = () => {
         tenantId: user.tenantId
       };
       
-      return saveToDatabase('inventory', newItem, mockInventory);
+      return saveToDatabase('inventory', newItem);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -61,7 +60,7 @@ export const Inventory = () => {
       const record = items?.find(i => i.id === id);
       if (record) {
         const updatedItem = { ...record, stock: newStock };
-        return saveToDatabase('inventory', updatedItem, mockInventory);
+        return saveToDatabase('inventory', updatedItem);
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inventory'] })

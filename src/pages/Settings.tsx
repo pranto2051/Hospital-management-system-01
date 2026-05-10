@@ -2,11 +2,14 @@ import React from 'react';
 import { 
   Settings as SettingsIcon, Shield, User, Bell, Database, HardDrive, Key, LogOut, Plus, Trash2, 
   Copy, Eye, EyeOff, Check, AlertCircle, Terminal, Smartphone, Laptop, Monitor, Tablet, 
-  Globe, Activity, Lock, Loader2 
+  Globe, Activity, Lock, Loader2, X 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
 import { ApiKey, RegisteredDevice } from '../types';
+
+import { fetchWithFallback, saveToDatabase } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 export const Settings = () => {
   const { user, logout } = useAuthStore();
@@ -23,40 +26,93 @@ export const Settings = () => {
   const [showKeyForm, setShowKeyForm] = React.useState(false);
   const [visibleKeys, setVisibleKeys] = React.useState<Record<string, boolean>>({});
   const [copiedKey, setCopiedKey] = React.useState<string | null>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   // API Keys Sync
   React.useEffect(() => {
     if (!user?.tenantId || activeSection !== 'API Management') return;
-    setIsLoadingKeys(true);
-    // Mock data
-    setApiKeys([]);
-    setIsLoadingKeys(false);
+    const fetchKeys = async () => {
+      setIsLoadingKeys(true);
+      const data = await fetchWithFallback<ApiKey>('api_keys', [], user.tenantId);
+      setApiKeys(data);
+      setIsLoadingKeys(false);
+    };
+    fetchKeys();
   }, [user?.tenantId, activeSection]);
 
   // Devices Sync
   React.useEffect(() => {
     if (!user?.tenantId || activeSection !== 'Registered Devices') return;
-    setIsLoadingDevices(true);
-    // Mock data
-    setDevices([]);
-    setIsLoadingDevices(false);
+    const fetchDevices = async () => {
+      setIsLoadingDevices(true);
+      const data = await fetchWithFallback<RegisteredDevice>('registered_devices', [], user.tenantId);
+      setDevices(data);
+      setIsLoadingDevices(false);
+    };
+    fetchDevices();
   }, [user?.tenantId, activeSection]);
 
   const addCurrentDevice = async () => {
-    console.log('Registering device...');
+    if (!user?.tenantId) return;
+    const deviceId = `dev-${Math.random().toString(36).substr(2, 9)}`;
+    const newDevice: RegisteredDevice = {
+      id: deviceId,
+      name: 'Current Browser Session',
+      type: 'Desktop',
+      browser: navigator.userAgent.split(' ')[0],
+      os: 'Web',
+      lastIp: 'Authorized',
+      lastSeen: Date.now(),
+      isTrusted: true,
+      userId: user.uid,
+      userName: user.name,
+      tenantId: user.tenantId
+    };
+    try {
+      setError(null);
+      await saveToDatabase('registered_devices', newDevice);
+      setDevices(prev => [...prev, newDevice]);
+    } catch (err: any) {
+      setError(err.message || 'Failed to register device');
+    }
   };
 
   const removeDevice = async (deviceId: string) => {
-    console.log('Removing device:', deviceId);
+    const { error } = await supabase.from('registered_devices').delete().eq('id', deviceId);
+    if (!error) setDevices(prev => prev.filter(d => d.id !== deviceId));
   };
 
   const generateApiKey = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Generating API Key...');
+    if (!user?.tenantId) return;
+    setIsGenerating(true);
+    const key = `med-${Math.random().toString(36).substr(2, 12)}-${Math.random().toString(36).substr(2, 12)}`;
+    const newKey: ApiKey = {
+      id: `ak-${Date.now()}`,
+      name: newKeyName,
+      description: newKeyDesc,
+      key,
+      createdAt: Date.now(),
+      tenantId: user.tenantId,
+      createdBy: user.uid
+    };
+    try {
+      setError(null);
+      await saveToDatabase('api_keys', newKey);
+      setApiKeys(prev => [newKey, ...prev]);
+      setIsGenerating(false);
+      setShowKeyForm(false);
+      setNewKeyName('');
+      setNewKeyDesc('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate API key');
+      setIsGenerating(false);
+    }
   };
 
   const revokeKey = async (keyId: string) => {
-    console.log('Revoking key:', keyId);
+    const { error } = await supabase.from('api_keys').delete().eq('id', keyId);
+    if (!error) setApiKeys(prev => prev.filter(k => k.id !== keyId));
   };
 
   const toggleKeyVisibility = (keyId: string) => {
@@ -323,6 +379,16 @@ export const Settings = () => {
           <p className="text-xs text-slate-500 font-medium mt-1">Tenant Configuration & Security Protocols</p>
         </div>
       </div>
+
+      {error && (
+        <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg flex items-center gap-2 text-rose-600 text-[11px] font-bold animate-in fade-in slide-in-from-top-2">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+          <button onClick={() => setError(null)} className="ml-auto hover:text-rose-800">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1 border-r border-slate-50 pr-4 space-y-1">

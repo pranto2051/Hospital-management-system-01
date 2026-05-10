@@ -7,7 +7,6 @@ import { cn } from '../lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { AppointmentForm } from '../components/AppointmentForm';
 import { fetchWithFallback, saveToDatabase } from '../services/api';
-import { mockDoctors, mockAppointments } from '../services/dataStorage';
 
 export const Appointments = () => {
   const { user } = useAuthStore();
@@ -21,14 +20,14 @@ export const Appointments = () => {
   const { data: doctors } = useQuery({
     queryKey: ['doctors', user?.tenantId],
     queryFn: async () => {
-      return fetchWithFallback('doctors', mockDoctors, user?.tenantId);
+      return fetchWithFallback<Doctor>('doctors', [], user?.tenantId);
     }
   });
 
   const { data: patients } = useQuery({
     queryKey: ['patients', user?.tenantId],
     queryFn: async () => {
-      return fetchWithFallback('patients', [], user?.tenantId);
+      return fetchWithFallback<Patient>('patients', [], user?.tenantId);
     }
   });
 
@@ -37,14 +36,13 @@ export const Appointments = () => {
     queryFn: async () => {
       if (!user?.tenantId) return [];
 
-      return fetchWithFallback('appointments', mockAppointments, user.tenantId, (q) => {
+      return fetchWithFallback<Appointment>('appointments', [], user.tenantId, (q) => {
         if (user.role === 'DOCTOR') return q.eq('doctorId', user.uid);
         if (user.role === 'PATIENT') return q.eq('patientId', user.uid);
         return q;
       });
     },
     enabled: !!user?.tenantId,
-    // Lower staleTime to ensure real-time feel during interaction
     staleTime: 1000
   });
 
@@ -63,10 +61,6 @@ export const Appointments = () => {
     
     let filtered = [...appointments];
 
-    // Filter out cancelled by default if requested? No, usually they are in the list but grayed out.
-    // However, if the user specifically asked for "where is another one" and they mean they expect visible active items.
-
-    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(a => 
@@ -75,7 +69,6 @@ export const Appointments = () => {
       );
     }
 
-    // Queue filter
     const now = new Date();
     
     const getLocalDateString = (d: Date) => {
@@ -126,11 +119,10 @@ export const Appointments = () => {
         createdAt: Date.now()
       };
       
-      return saveToDatabase('appointments', newAppointment, mockAppointments);
+      return saveToDatabase('appointments', newAppointment);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });
-      queryClient.invalidateQueries({ queryKey: ['appointment-counts'] });
       setIsAddModalOpen(false);
     }
   });
@@ -141,7 +133,7 @@ export const Appointments = () => {
       if (!record) throw new Error('Appointment not found');
       
       const updated = { ...record, status: AppointmentStatus.CANCELLED };
-      return saveToDatabase('appointments', updated, mockAppointments);
+      return saveToDatabase('appointments', updated);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['appointments'] });

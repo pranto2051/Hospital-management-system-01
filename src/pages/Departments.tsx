@@ -2,37 +2,111 @@ import React from 'react';
 import { 
   Building2, Plus, Search, Layers, UserCircle, Settings, MoreVertical, 
   Globe, Shield, Activity, Users, Thermometer, Zap, Microscope, 
-  HeartPulse, Stethoscope, Baby, Pill, Brain, Eye
+  HeartPulse, Stethoscope, Baby, Pill, Brain, Eye, Trash2, Edit3, X, Info
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import { cn } from '../lib/utils';
+import { fetchWithFallback, saveToDatabase, deleteFromDatabase } from '../services/api';
+import { Department } from '../types';
+import { mockDepartments } from '../services/dataStorage';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const iconMap: Record<string, any> = {
+  'Cardiology': HeartPulse,
+  'Orthopedics': Activity,
+  'Neurology': Brain,
+  'Pediatrics': Baby,
+  'Dermatology': UserCircle,
+  'Emergency': Zap,
+  'Radiology': Layers,
+  'Oncology': Pill,
+  'Gastroenterology': Activity,
+  'Ophthalmology': Eye,
+  'Pathology': Microscope,
+  'Psychiatry': Brain,
+};
 
 export const Departments = () => {
   const { user } = useAuthStore();
   const [searchTerm, setSearchTerm] = React.useState('');
+  const [depts, setDepts] = React.useState<Department[]>([]);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [editingDept, setEditingDept] = React.useState<Department | null>(null);
+  
+  // Form State
+  const [formData, setFormData] = React.useState({
+    name: '',
+    description: '',
+  });
 
-  const departments = [
-    { name: 'Cardiology', heads: 'Dr. Rivera', staff: 42, status: 'Active', load: '65%', icon: HeartPulse, type: 'Medical' },
-    { name: 'Orthopedics', heads: 'Dr. Smith', staff: 28, status: 'Active', load: '82%', icon: Activity, type: 'Surgery' },
-    { name: 'Neurology', heads: 'Dr. Chen', staff: 15, status: 'Maintenance', load: '40%', icon: Brain, type: 'Medical' },
-    { name: 'Pediatrics', heads: 'Dr. Vane', staff: 34, status: 'Active', load: '58%', icon: Baby, type: 'General' },
-    { name: 'Dermatology', heads: 'Dr. Kim', staff: 12, status: 'Active', load: '25%', icon: UserCircle, type: 'Outpatient' },
-    { name: 'Emergency', heads: 'Dr. Ross', staff: 56, status: 'Active', load: '95%', icon: Zap, type: 'Critical' },
-    { name: 'Radiology', heads: 'Dr. Grant', staff: 20, status: 'Active', load: '72%', icon: Layers, type: 'Diagnostic' },
-    { name: 'Oncology', heads: 'Dr. Foster', staff: 25, status: 'Active', load: '48%', icon: Pill, type: 'Medical' },
-    { name: 'Gastroenterology', heads: 'Dr. Lee', staff: 18, status: 'Active', load: '32%', icon: Activity, type: 'Medical' },
-    { name: 'Ophthalmology', heads: 'Dr. Wu', staff: 10, status: 'Active', load: '15%', icon: Eye, type: 'Outpatient' },
-    { name: 'Pathology', heads: 'Dr. Thorne', staff: 14, status: 'Active', load: '60%', icon: Microscope, type: 'Laboratory' },
-    { name: 'Psychiatry', heads: 'Dr. Bell', staff: 22, status: 'Active', load: '45%', icon: Brain, type: 'Wellness' },
-  ];
+  const loadDepartments = React.useCallback(async () => {
+    setIsLoading(true);
+    const data = await fetchWithFallback<Department>('departments', mockDepartments, user?.tenantId);
+    setDepts(data);
+    setIsLoading(false);
+  }, [user?.tenantId]);
 
-  const filteredDepts = departments.filter(d => 
+  React.useEffect(() => {
+    loadDepartments();
+  }, [loadDepartments]);
+
+  const handleOpenModal = (dept?: Department) => {
+    if (dept) {
+      setEditingDept(dept);
+      setFormData({ name: dept.name, description: dept.description });
+    } else {
+      setEditingDept(null);
+      setFormData({ name: '', description: '' });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditingDept(null);
+    setFormData({ name: '', description: '' });
+  };
+
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!user?.tenantId) return;
+
+    try {
+      const newDept: Department = {
+        id: editingDept?.id || `dept-${Date.now()}`,
+        name: formData.name,
+        description: formData.description,
+        tenantId: user.tenantId,
+      };
+
+      await saveToDatabase('departments', newDept);
+      await loadDepartments();
+      handleCloseModal();
+    } catch (err: any) {
+      console.error('Save failed:', err);
+      setError(err.message || 'Failed to initialize unit. Check database connection and policies.');
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('Are you sure you want to decommission this unit? This action is irreversible.')) {
+      await deleteFromDatabase('departments', id);
+      await loadDepartments();
+    }
+  };
+
+  const filteredDepts = depts.filter(d => 
     d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    d.heads.toLowerCase().includes(searchTerm.toLowerCase())
+    d.description.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold text-slate-900 tracking-tight uppercase">Operational Modalities</h1>
@@ -49,17 +123,21 @@ export const Departments = () => {
               className="pl-8 pr-4 py-1.5 bg-white border border-slate-200 rounded text-xs font-medium focus:ring-2 focus:ring-blue-500/10 outline-none w-48"
             />
           </div>
-          <button className="bg-slate-900 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-sm">
+          <button 
+            onClick={() => handleOpenModal()}
+            className="bg-slate-900 text-white px-3 py-1.5 rounded text-[10px] font-bold uppercase tracking-widest flex items-center gap-2 hover:bg-slate-800 transition-all shadow-sm"
+          >
             <Plus className="w-3.5 h-3.5" />
             INITIALIZE UNIT
           </button>
         </div>
       </div>
 
+      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Clinical Units', count: departments.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Active Personnel', count: departments.reduce((acc, d) => acc + d.staff, 0), icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Clinical Units', count: depts.length, icon: Building2, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Active Personnel', count: '--', icon: Users, color: 'text-indigo-600', bg: 'bg-indigo-50' },
           { label: 'System Load', count: '62.4%', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50' },
           { label: 'Infrastructure', count: 'L4-Tier', icon: Layers, color: 'text-emerald-600', bg: 'bg-emerald-50' },
         ].map((stat, i) => (
@@ -75,75 +153,76 @@ export const Departments = () => {
         ))}
       </div>
 
+      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredDepts.map((dept, i) => (
-          <div key={i} className="card bg-white border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all group overflow-hidden">
-             <div className="p-4 border-b border-slate-50 flex justify-between items-start">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all border border-slate-100">
-                      <dept.icon className="w-5 h-5" />
-                   </div>
-                   <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-slate-800 text-sm leading-none">{dept.name}</h3>
+        <AnimatePresence>
+          {filteredDepts.map((dept) => {
+            const Icon = iconMap[dept.name] || Building2;
+            return (
+              <motion.div 
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                key={dept.id} 
+                className="card bg-white border border-slate-100 hover:border-blue-200 hover:shadow-lg transition-all group overflow-hidden"
+              >
+                <div className="p-4 border-b border-slate-50 flex justify-between items-start">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-blue-600 group-hover:bg-blue-50 transition-all border border-slate-100">
+                          <Icon className="w-5 h-5" />
                       </div>
-                      <p className="text-[9px] text-blue-600 font-bold uppercase mt-1 tracking-tighter opacity-70">{dept.type} DIVISION</p>
-                   </div>
+                      <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-slate-800 text-sm leading-none">{dept.name}</h3>
+                          </div>
+                          <p className="text-[9px] text-blue-600 font-bold uppercase mt-1 tracking-tighter opacity-70">Clinical DIVISION</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-1">
+                      <button 
+                        onClick={() => handleOpenModal(dept)}
+                        className="p-1.5 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded transition-all"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button 
+                        onClick={() => handleDelete(dept.id)}
+                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                 </div>
-                <button className="p-1 text-slate-300 hover:text-slate-600 transition-colors">
-                   <MoreVertical className="w-4 h-4" />
-                </button>
-             </div>
-             
-             <div className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Department Head</p>
-                    <p className="text-[11px] font-bold text-slate-700 truncate">{dept.heads}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Active Staff</p>
-                    <p className="text-[11px] font-bold text-slate-700">{dept.staff} Members</p>
-                  </div>
-                </div>
+                
+                <div className="p-4 space-y-4">
+                    <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Protocol Description</p>
+                      <p className="text-[11px] text-slate-600 leading-relaxed line-clamp-2 min-h-[32px]">
+                        {dept.description || 'No description provided for this operational node.'}
+                      </p>
+                    </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-[9px] font-bold">
-                    <span className="text-slate-400 uppercase tracking-wider">Resource Allocation</span>
-                    <span className={cn(
-                      "font-mono",
-                      parseInt(dept.load) > 80 ? "text-rose-600" : "text-blue-600"
-                    )}>{dept.load}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                    <div 
-                      className={cn(
-                        "h-full transition-all duration-500", 
-                        parseInt(dept.load) > 80 ? 'bg-rose-500' : 'bg-blue-500'
-                      )} 
-                      style={{ width: dept.load }} 
-                    />
-                  </div>
+                    <div className="pt-2 flex justify-between items-center border-t border-slate-50 mt-2">
+                      <div className="flex items-center gap-1.5 font-bold text-[9px]">
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-emerald-700 uppercase">Operational</span>
+                      </div>
+                      <button className="text-[9px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors flex items-center gap-1">
+                        <Settings className="w-3 h-3" />
+                        Configure
+                      </button>
+                    </div>
                 </div>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
 
-                <div className="pt-2 flex justify-between items-center border-t border-slate-50 mt-2">
-                   <div className="flex items-center gap-1.5 font-bold text-[9px]">
-                     <div className={cn(
-                       "w-1.5 h-1.5 rounded-full",
-                       dept.status === 'Active' ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
-                     )} />
-                     <span className={dept.status === 'Active' ? "text-emerald-700" : "text-amber-700 uppercase"}>{dept.status}</span>
-                   </div>
-                   <button className="text-[9px] font-black text-slate-400 hover:text-blue-600 uppercase tracking-widest transition-colors flex items-center gap-1">
-                     <Settings className="w-3 h-3" />
-                     Configure
-                   </button>
-                </div>
-             </div>
-          </div>
-        ))}
-
-        <button className="h-full min-h-[220px] rounded-xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center gap-3 group hover:border-blue-200 hover:bg-blue-50/10 transition-all p-6">
+        <button 
+          onClick={() => handleOpenModal()}
+          className="h-full min-h-[200px] rounded-xl border-2 border-dashed border-slate-100 flex flex-col items-center justify-center gap-3 group hover:border-blue-200 hover:bg-blue-50/10 transition-all p-6"
+        >
            <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-blue-100 group-hover:text-blue-600 transition-all">
               <Plus className="w-6 h-6" />
            </div>
@@ -153,7 +232,86 @@ export const Departments = () => {
            </div>
         </button>
       </div>
+
+      {/* Initialization Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={handleCloseModal}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" 
+            />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="relative bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-100"
+            >
+              <div className="p-6 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-widest">
+                    {editingDept ? 'Modify Operational Node' : 'Initialize New Unit'}
+                  </h2>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter mt-1">MediCore Protocol v4.2</p>
+                </div>
+                <button onClick={handleCloseModal} className="p-2 text-slate-400 hover:text-slate-600 transition-colors">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                {error && (
+                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg flex items-center gap-2 text-rose-600 text-[11px] font-bold">
+                    <Info className="w-4 h-4" />
+                    {error}
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unit Designation</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g. Cardiology"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocol Description</label>
+                  <textarea 
+                    rows={4}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Describe the clinical focus and responsibilities of this unit..."
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium resize-none"
+                  />
+                </div>
+
+                <div className="pt-4 flex gap-3">
+                  <button 
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-slate-50 transition-all"
+                  >
+                    Abort
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 px-4 py-2.5 bg-slate-900 text-white rounded-lg text-[11px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20"
+                  >
+                    {editingDept ? 'Update Node' : 'Confirm Initialization'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
-
