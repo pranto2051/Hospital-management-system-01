@@ -1,0 +1,8 @@
+{
+  "name": "HMS",
+  "description": "Professional hospital management system with real-time patient care, clinical diagnostics, and facility monitoring.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
